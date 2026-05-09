@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "BusinessData": {
+      "title": "Business Project Data",
+      "description": "Full financial model and project settings for a business simulation.",
+      "type": "object",
+      "properties": {
+        "budgetId": { "type": "string", "description": "Unique ID for the project" },
+        "businessIdea": { "type": "string" },
+        "industry": { "type": "string" },
+        "isInternational": { "type": "boolean" },
+        "revenueStreams": { "type": "array", "items": { "$ref": "#/entities/FinancialItem" } },
+        "costCategories": { "type": "array", "items": { "$ref": "#/entities/FinancialCategory" } },
+        "personnelSettings": { "type": "object" },
+        "strategicSettings": { "type": "object" },
+        "members": { "type": "array" },
+        "memberEmails": { "type": "array", "items": { "type": "string" } },
+        "memberRoles": { "type": "object", "additionalProperties": { "type": "string" } },
+        "activeScenarioId": { "type": "string" },
+        "baseCurrency": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["businessIdea", "industry", "ownerId"]
+    },
+    "FinancialItem": {
+      "title": "Financial Item",
+      "description": "A single revenue or cost item in the model.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "value": { "type": "number" },
+        "calculationMode": { "type": "string" }
+      }
+    },
+    "FinancialCategory": {
+      "title": "Financial Category",
+      "description": "A group of financial items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/entities/FinancialItem" } }
+      }
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message in the AI chat history.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "model", "assistant"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "content", "timestamp"]
+    },
+    "ProjectComment": {
+      "title": "Project Comment",
+      "description": "A comment left on a financial item or the project in general.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["itemId", "authorId", "text", "timestamp"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User-specific settings and metadata.",
+      "type": "object",
+      "properties": {
+        "hasSeenGuide": { "type": "boolean" },
+        "isHeaderExpanded": { "type": "boolean" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile": {
+      "schema": "UserProfile",
+      "description": "User profile and settings."
+    },
+    "/users/{userId}/chats": {
+      "schema": "ChatMessage",
+      "description": "AI chat history for the user."
+    },
+    "/budgets": {
+      "schema": "BusinessData",
+      "description": "Financial models/projects."
+    },
+    "/budgets/{budgetId}/comments": {
+      "schema": "ProjectComment",
+      "description": "Comments on a specific budget."
+    }
+  }
+}

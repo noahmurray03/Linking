@@ -1,0 +1,1 @@
+                            <InfoTooltip text="Systemets statistiska tillförlitlighet baserat på inmatad datakvalitet och kalkylmodellens logiska integritet. Ett högt värde indikerar en robust analys." iconSize={10} />

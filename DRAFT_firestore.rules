@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- User Profiles ---
+    match /users/{userId}/profile {
+      allow read, write: if isOwner(userId);
+      
+      function isValidProfile(data) {
+        return data.keys().hasAll(['email']) &&
+               data.email is string && data.email.size() <= 256;
+      }
+    }
+
+    // --- Chat History ---
+    match /users/{userId}/chats/{chatId} {
+      allow read, write: if isOwner(userId);
+      
+      function isValidChat(data) {
+        return data.keys().hasAll(['role', 'content', 'timestamp']) &&
+               data.role in ['user', 'model', 'assistant'] &&
+               data.content is string && data.content.size() <= 10000 &&
+               data.timestamp == request.time;
+      }
+    }
+
+    // --- Budgets (Projects) ---
+    match /budgets/{budgetId} {
+      
+      function isMember() {
+        return isSignedIn() && (
+          existing().ownerId == request.auth.uid ||
+          existing().memberEmails.hasAny([request.auth.token.email])
+        );
+      }
+
+      function canWrite() {
+        return isSignedIn() && (
+          existing().ownerId == request.auth.uid ||
+          existing().memberRoles[request.auth.token.email] in ['editor', 'owner']
+        );
+      }
+
+      allow get: if isMember();
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.memberEmails.hasAny([request.auth.token.email]));
+      
+      allow create: if isSignedIn() && isValidBudget(incoming()) && incoming().ownerId == request.auth.uid;
+      
+      allow update: if canWrite() && isValidBudget(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'businessIdea', 'industry', 'revenueStreams', 'costCategories', 
+          'personnelSettings', 'strategicSettings', 'members', 'memberEmails', 'memberRoles',
+          'activeScenarioId', 'baseCurrency', 'updatedAt'
+        ]) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().updatedAt == request.time
+      );
+
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      function isValidBudget(data) {
+        return data.keys().hasAll(['businessIdea', 'industry', 'ownerId']) &&
+               data.businessIdea is string && data.businessIdea.size() <= 5000 &&
+               data.industry is string && data.industry.size() <= 100 &&
+               data.ownerId == request.auth.uid &&
+               (data.keys().hasAll(['createdAt']) ? data.createdAt == request.time : true);
+      }
+
+      // --- Comments ---
+      match /comments/{commentId} {
+        allow read: if isMember();
+        allow create: if isMember() && isValidComment(incoming());
+        allow delete: if isMember() && (existing().authorId == request.auth.uid || getParentBudget().ownerId == request.auth.uid);
+
+        function isValidComment(data) {
+          return data.keys().hasAll(['itemId', 'authorId', 'text', 'timestamp']) &&
+                 data.itemId is string && data.itemId.size() <= 128 &&
+                 data.authorId == request.auth.uid &&
+                 data.text is string && data.text.size() <= 1000 &&
+                 data.timestamp == request.time;
+        }
+
+        function getParentBudget() {
+          return get(/databases/$(database)/documents/budgets/$(budgetId)).data;
+        }
+      }
+    }
+  }
+}
